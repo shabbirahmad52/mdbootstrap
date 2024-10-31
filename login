@@ -1,182 +1,91 @@
-admin_dashboard
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
+from werkzeug.security import generate_password_hash
+from database import db, User  # Assuming you have a database setup with User model
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Admin Dashboard</title>
-    <!-- MDBootstrap CSS -->
-    <link href="../static/mdb/css/mdb.min.css" rel="stylesheet">
-    <style>
-        /* Custom sidebar and layout styling */
-        .sidebar { width: 250px; min-height: 100vh; background-color: #343a40; color: #fff; }
-        .sidebar .nav-link { color: #adb5bd; font-size: 1.1rem; }
-        .sidebar .nav-link:hover, .sidebar .active { background-color: #495057; color: #fff; }
-        .content { padding: 30px; }
-    </style>
-</head>
-<body class="bg-light">
-    <div class="d-flex">
-        <!-- Sidebar -->
-        <div class="sidebar p-3">
-            <h4 class="text-white mb-4">Admin Panel</h4>
-            <ul class="nav flex-column">
-                <li class="nav-item mb-2"><a href="#" class="nav-link active"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-                <li class="nav-item mb-2"><a href="#" class="nav-link"><i class="fas fa-users"></i> Manage Users</a></li>
-                <li class="nav-item mb-2"><a href="#" class="nav-link"><i class="fas fa-cogs"></i> Settings</a></li>
-                <li class="nav-item mb-2"><a href="#" class="nav-link"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
-            </ul>
-        </div>
+app = Flask(__name__)
+app.secret_key = 'your_secret_key'
 
-        <!-- Main Content -->
-        <div class="container my-5 flex-grow-1 content">
-            <h2 class="text-center mb-4">Admin Dashboard</h2>
-            <div class="text-end mb-3">
-                <a href="/add_user" class="btn btn-success">Add New User</a>
-            </div>
-            <div class="card">
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Username</th>
-                                    <th>Status</th>
-                                    <th>QR Code</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for user in users %}
-                                <tr>
-                                    <td>{{ user[1] }}</td>
-                                    <td>
-                                        <div class="form-check form-switch">
-                                            <input type="checkbox" class="form-check-input user-status-switch"
-                                                   id="status-switch-{{ user[0] }}" data-user-id="{{ user[0] }}"
-                                                   {% if user[2] %}checked{% endif %}>
-                                            <label class="form-check-label" for="status-switch-{{ user[0] }}">
-                                                {{ "Enabled" if user[2] else "Disabled" }}
-                                            </label>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="form-check form-switch">
-                                            <input type="checkbox" class="form-check-input user-qr-switch"
-                                                   id="qr-switch-{{ user[0] }}" data-user-id="{{ user[0] }}"
-                                                   {% if user[3] %}checked{% endif %}>
-                                            <label class="form-check-label" for="qr-switch-{{ user[0] }}">
-                                                {{ "QR Enabled" if user[3] else "QR Disabled" }}
-                                            </label>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <a href="/edit_user/{{ user[0] }}" class="btn btn-primary btn-sm">
-                                            <i class="fas fa-edit"></i> Edit
-                                        </a>
-                                        <button class="btn btn-danger btn-sm delete-user" data-user-id="{{ user[0] }}">
-                                            <i class="fas fa-trash-alt"></i> Delete
-                                        </button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+# Sample User model setup for reference
+# class User(db.Model):
+#     id = db.Column(db.Integer, primary_key=True)
+#     username = db.Column(db.String(80), unique=True, nullable=False)
+#     password = db.Column(db.String(200), nullable=False)
+#     status = db.Column(db.Boolean, default=False)
+#     qr_enabled = db.Column(db.Boolean, default=False)
 
-    <!-- MDBootstrap JS -->
-    <script src="../static/mdb/js/mdb.min.js"></script>
+# Route to display users
+@app.route('/')
+def admin_dashboard():
+    users = User.query.all()
+    return render_template('index.html', users=users)
 
-    <script>
-        // Enable status and QR code toggle logic
-        // Similar to the previous JavaScript code for handling these actions
-    </script>
-</body>
-</html>
+# Route to add a new user
+@app.route('/add_user', methods=['GET', 'POST'])
+def add_user():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        status = bool(request.form.get('status'))
+        qr_enabled = bool(request.form.get('qr'))
 
+        if not username or not password:
+            flash("Username and password are required!", "error")
+            return redirect(url_for('add_user'))
 
-Add User: 
+        hashed_password = generate_password_hash(password)
 
+        new_user = User(username=username, password=hashed_password, status=status, qr_enabled=qr_enabled)
+        db.session.add(new_user)
+        db.session.commit()
+        flash("User added successfully!", "success")
+        return redirect(url_for('admin_dashboard'))
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Add User</title>
-    <link href="../static/mdb/css/mdb.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-    <div class="container my-5">
-        <h2 class="text-center mb-4">Add New User</h2>
-        <div class="card">
-            <div class="card-body">
-                <form action="/add_user" method="POST">
-                    <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" name="username" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
-                    </div>
-                    <div class="mb-3 form-check form-switch">
-                        <input type="checkbox" class="form-check-input" id="status" name="status">
-                        <label class="form-check-label" for="status">Enable User</label>
-                    </div>
-                    <div class="mb-3 form-check form-switch">
-                        <input type="checkbox" class="form-check-input" id="qr" name="qr">
-                        <label class="form-check-label" for="qr">Enable QR Code</label>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Add User</button>
-                    <a href="/" class="btn btn-secondary">Cancel</a>
-                </form>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
+    return render_template('add_user.html')
 
+# Route to edit an existing user
+@app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
+def edit_user(user_id):
+    user = User.query.get_or_404(user_id)
 
-Edit User
+    if request.method == 'POST':
+        user.username = request.form.get('username')
+        password = request.form.get('password')
+        user.status = bool(request.form.get('status'))
+        user.qr_enabled = bool(request.form.get('qr'))
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Edit User</title>
-    <link href="../static/mdb/css/mdb.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-    <div class="container my-5">
-        <h2 class="text-center mb-4">Edit User</h2>
-        <div class="card">
-            <div class="card-body">
-                <form action="/edit_user/{{ user[0] }}" method="POST">
-                    <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" name="username" value="{{ user[1] }}" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" name="password">
-                    </div>
-                    <div class="mb-3 form-check form-switch">
-                        <input type="checkbox" class="form-check-input" id="status" name="status" {% if user[2] %}checked{% endif %}>
-                        <label class="form-check-label" for="status">Enable User</label>
-                    </div>
-                    <div class="mb-3 form-check form-switch">
-                        <input type="checkbox" class="form-check-input" id="qr" name="qr" {% if user[3] %}checked{% endif %}>
-                        <label class="form-check-label" for="qr">Enable QR Code</label>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
-                    <a href="/" class="btn btn-secondary">Cancel</a>
-                </form>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
+        if password:
+            user.password = generate_password_hash(password)
+
+        db.session.commit()
+        flash("User updated successfully!", "success")
+        return redirect(url_for('admin_dashboard'))
+
+    return render_template('edit_user.html', user=user)
+
+# Route to delete a user
+@app.route('/delete_user/<int:user_id>', methods=['POST'])
+def delete_user(user_id):
+    user = User.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    flash("User deleted successfully!", "success")
+    return redirect(url_for('admin_dashboard'))
+
+# Route to toggle user status
+@app.route('/toggle_status/<int:user_id>', methods=['POST'])
+def toggle_status(user_id):
+    user = User.query.get_or_404(user_id)
+    user.status = not user.status
+    db.session.commit()
+    return jsonify({'status': 'success', 'new_status': user.status})
+
+# Route to toggle QR code status
+@app.route('/toggle_qr/<int:user_id>', methods=['POST'])
+def toggle_qr(user_id):
+    user = User.query.get_or_404(user_id)
+    user.qr_enabled = not user.qr_enabled
+    db.session.commit()
+    return jsonify({'status': 'success', 'new_qr_status': user.qr_enabled})
+
+if __name__ == '__main__':
+    app.run(debug=True)
